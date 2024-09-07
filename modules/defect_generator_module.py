@@ -51,7 +51,8 @@ def cutout_with_default_background(original_frame:np.ndarray = None, labels:List
     for label in labels:
         #>>> Apply the cutout operation with a probability, if the probability is not met, skip the label
         if random.random() > probability_per_label:
-            continue
+            continue        
+        label[0] = 1 # without defect class(0), defect class(1)
 
         #>>> Determine the cutout rectangle bbox        
         #0:<class> 1:<nx_center> 2:<ny_center> 3:<nwidth> 4:<nheight>
@@ -88,7 +89,8 @@ def line_scar(original_frame: np.ndarray = None, labels: List[str] = None, proba
         #>>> Probability check
         if random.random() > probability_per_label:
             continue
-        
+        label[0] = 1 # without defect class(0), defect class(1)
+
         number_of_scars = random.randint(1, max_scar_per_label)  # Random number of scars to add
         for _ in range(number_of_scars):
             #>>> Generate random scar color if not provided
@@ -98,10 +100,10 @@ def line_scar(original_frame: np.ndarray = None, labels: List[str] = None, proba
             x_center, y_center, width, height = label[1], label[2], label[3], label[4]
             
             # Calculate bounding box coordinates
-            bbox_x1 = int((x_center - width / 2) * frame.shape[1])
-            bbox_y1 = int((y_center - height / 2) * frame.shape[0])
-            bbox_x2 = int((x_center + width / 2) * frame.shape[1])
-            bbox_y2 = int((y_center + height / 2) * frame.shape[0])
+            bbox_x1 = int((x_center - width / 2) * edited_frame.shape[1])
+            bbox_y1 = int((y_center - height / 2) * edited_frame.shape[0])
+            bbox_x2 = int((x_center + width / 2) * edited_frame.shape[1])
+            bbox_y2 = int((y_center + height / 2) * edited_frame.shape[0])
             
             # Random start point inside the bounding box
             start_point = (
@@ -110,7 +112,7 @@ def line_scar(original_frame: np.ndarray = None, labels: List[str] = None, proba
             )
             
             # Random line length and angle
-            line_length = random.uniform(0, max_scar_nlength) * frame.shape[1]  # Max width
+            line_length = random.uniform(0, max_scar_nlength) * edited_frame.shape[1]  # Max width
             angle = random.uniform(0, 360)  # Random angle
             
             # Calculate end point based on the random angle and length
@@ -160,6 +162,7 @@ def polygon_color_mask(original_frame: np.ndarray = None, labels: List[str] = No
         # Probability check
         if random.random() > probability_per_label:
             continue
+        label[0] = 1 # without defect class(0), defect class(1)
 
         # Generate random color if not provided
         color = desired_color or [random.randint(0, 255) for _ in range(3)]
