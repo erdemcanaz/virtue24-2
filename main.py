@@ -18,16 +18,16 @@ import uuid
 # TODO: Tuna will implement augmentation functions
 ###############################
 
-for i in range(500):
+for i in range(100):
     original_frame = cv2.imread('borek_3.png')
     labels = [ [0, 0.47, 0.48, 0.22, 0.62], [0, 0.86, 0.50, 0.3, 0.35] ] 
 
     #>> Cutout with default background
     edited_frame, labels = defect_generator_module.cutout_with_default_background(
         original_frame= original_frame,
-        probability_per_label=0.15,
+        probability_per_label=0.1,
         labels= labels,
-        max_normalized_bbox_size= [0.20, 0.20],
+        max_normalized_bbox_size= [0.2, 0.2],
         default_background_color = (246,207,122),
         show_edited_frame = False
     )
@@ -36,12 +36,12 @@ for i in range(500):
     edited_frame, labels = defect_generator_module.line_scar(
         original_frame= edited_frame,
         labels= labels,
-        probability_per_label= 0.15,
+        probability_per_label= 0.1,
         max_scar_per_label= 5,
         desired_scar_color= None,
-        opacity_range= [0.3, 0.95],
+        opacity_range= [0.5, 0.95],
         max_scar_nlength= 0.25,
-        max_scar_thickness= 2,
+        max_scar_thickness= 3,
         show_edited_frame = False
     )
 
@@ -49,11 +49,11 @@ for i in range(500):
     edited_frame, labels = defect_generator_module.polygon_color_mask(
         original_frame= edited_frame,
         labels= labels,
-        probability_per_label= 0.15,
+        probability_per_label= 0.1,
         desired_color= None,
         num_sides= 7,
-        opacity_range= [0.2,0.8],
-        scale_factor_range = [0.05,0.5],
+        opacity_range= [0.5,0.9],
+        scale_factor_range = [0.1,0.5],
         show_edited_frame = False
     )
 
