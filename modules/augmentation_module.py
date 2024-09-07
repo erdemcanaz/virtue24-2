@@ -73,8 +73,25 @@ class ImageAugmentor:
         M = cv2.getRotationMatrix2D(center, angle, 1.0)
         rotated = cv2.warpAffine(self.frame, M, (self.w, self.h))
         
-        # Update labels (no change for simplicity, would need complex adjustments based on rotation math)
-        return rotated, self.labels
+        # Update labels: rotate the (x_center, y_center) of each label
+        new_labels = []
+        for cls, x_center, y_center, bbox_width, bbox_height in self.labels:
+            # Convert normalized coordinates to pixel coordinates
+            x_center_pixel = x_center * self.w
+            y_center_pixel = y_center * self.h
+
+            # Apply the rotation matrix to the center of the bounding box
+            new_x_center_pixel = M[0, 0] * x_center_pixel + M[0, 1] * y_center_pixel + M[0, 2]
+            new_y_center_pixel = M[1, 0] * x_center_pixel + M[1, 1] * y_center_pixel + M[1, 2]
+
+            # Convert back to normalized coordinates
+            new_x_center = new_x_center_pixel / self.w
+            new_y_center = new_y_center_pixel / self.h
+
+            # Append the new label with the rotated center, keeping width and height unchanged
+            new_labels.append((cls, new_x_center, new_y_center, bbox_width, bbox_height))
+        
+        return rotated, new_labels
 
     def flip_image(self, flip_code: int) -> Tuple[np.ndarray, List[Tuple[int, float, float, float, float]]]:
         flipped = cv2.flip(self.frame, flip_code)
@@ -108,12 +125,7 @@ class ImageAugmentor:
         start_h, start_w = (self.h - new_h) // 2, (self.w - new_w) // 2
         cropped = self.frame[start_h:start_h + new_h, start_w:start_w + new_w]
         
-        # Update labels
-        new_labels = [
-            (cls, (x_center * self.w - start_w) / new_w, (y_center * self.h - start_h) / new_h, width * self.w / new_w, height * self.h / new_h)
-            for cls, x_center, y_center, width, height in self.labels
-        ]
-        return cropped, new_labels
+        return cropped, self.labels
 
     def apply_color_filter(self) -> Tuple[np.ndarray, List[Tuple[int, float, float, float, float]]]:
         hsv = cv2.cvtColor(self.frame, cv2.COLOR_BGR2HSV)
@@ -189,7 +201,7 @@ class ImageAugmentor:
 image_path = "borek.png"
 frame = cv2.imread(image_path, cv2.IMREAD_COLOR)
 
-labels = [[0, 0.5, 0.5, 0.5, 0.5], [1, 0.5, 0.5, 0.5, 0.5]]
+labels = [[0, 0.5, 0.5, 1, 1]]
 frame_with_boxes = draw_bounding_boxes(frame, labels)
 display_image(frame_with_boxes, f"Augmentation: None")
 
