@@ -13,6 +13,7 @@
 # output: image with augmented object will be returned
 
 import cv2
+import copy
 import numpy as np
 import random
 from typing import List, Tuple, Dict
@@ -27,7 +28,10 @@ def display_image(image: np.ndarray, title: str = ""):
     plt.show()
 
 def draw_bounding_boxes(image: np.ndarray, labels: List[Tuple[int, float, float, float, float]], color=(0, 255, 0), thickness=2) -> np.ndarray:
+    image = copy.deepcopy(image)
     h, w = image.shape[:2]
+
+    print("label: ",labels)
     
     for label in labels:
         class_id, x_center, y_center, bbox_width, bbox_height = label
@@ -55,15 +59,16 @@ def draw_bounding_boxes(image: np.ndarray, labels: List[Tuple[int, float, float,
 
 class ImageAugmentor:
     def __init__(self, frame: np.ndarray, labels: List[Tuple[int, float, float, float, float]]):
-        self.frame = frame
+        self.original_frame = frame
+        self.edited_frame = copy.deepcopy(frame)
         self.labels = labels
-        self.h, self.w = self.frame.shape[:2]  # Store image height and width
+        self.h, self.w = self.original_frame.shape[:2]  # Store image height and width
 
     def rotate_image(self, angle: float) -> Tuple[np.ndarray, List[Tuple[int, float, float, float, float]]]:
         # Get rotation matrix
         center = (self.w // 2, self.h // 2)
         M = cv2.getRotationMatrix2D(center, angle, 1.0)
-        rotated = cv2.warpAffine(self.frame, M, (self.w, self.h))
+        rotated = cv2.warpAffine(self.edited_frame, M, (self.w, self.h))
         
         # Update labels: rotate the (x_center, y_center) of each label
         new_labels = []
@@ -83,10 +88,12 @@ class ImageAugmentor:
             # Append the new label with the rotated center, keeping width and height unchanged
             new_labels.append((cls, new_x_center, new_y_center, bbox_width, bbox_height))
         
-        return rotated, new_labels
+        image_with_boxes = draw_bounding_boxes(rotated, new_labels)
+        
+        return image_with_boxes, new_labels
 
     def flip_image(self, flip_code: int) -> Tuple[np.ndarray, List[Tuple[int, float, float, float, float]]]:
-        flipped = cv2.flip(self.frame, flip_code)
+        flipped = cv2.flip(self.edited_frame, flip_code)
         
         # Update labels for horizontal flip (flip_code = 1)
         if flip_code == 1:
@@ -110,10 +117,10 @@ class ImageAugmentor:
         return flipped, new_labels
 
     def duplicate_image(self) -> Tuple[np.ndarray, List[Tuple[int, float, float, float, float]]]:
-        return self.frame.copy(), self.labels
+        return self.edited_frame.copy(), self.labels
 
     def crop_image(self, crop_factor: float) -> Tuple[np.ndarray, List[Tuple[int, float, float, float, float]]]:
-        new_frame = self.frame.copy()
+        new_frame = self.edited_frame.copy()
         new_labels = []
 
         for label in self.labels:
@@ -142,7 +149,7 @@ class ImageAugmentor:
             new_y2 = y_center_pixel + cropped_height_pixel // 2
 
             # Crop the region from the original frame
-            cropped_region = self.frame[new_y1:new_y2, new_x1:new_x2]
+            cropped_region = self.edited_frame[new_y1:new_y2, new_x1:new_x2]
 
             # Paste the cropped region back to the original location
             new_frame[y1:y2, x1:x2] = cv2.resize(cropped_region, (bbox_width_pixel, bbox_height_pixel))
@@ -155,13 +162,13 @@ class ImageAugmentor:
         return new_frame, new_labels
 
     def apply_color_filter(self) -> Tuple[np.ndarray, List[Tuple[int, float, float, float, float]]]:
-        hsv = cv2.cvtColor(self.frame, cv2.COLOR_BGR2HSV)
+        hsv = cv2.cvtColor(self.edited_frame, cv2.COLOR_BGR2HSV)
         hsv[:, :, 1] = hsv[:, :, 1] * random.uniform(0.5, 1.5)
         filtered = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
         return filtered, self.labels
 
     def adjust_contrast_brightness(self, contrast: float, brightness: int) -> Tuple[np.ndarray, List[Tuple[int, float, float, float, float]]]:
-        adjusted = cv2.convertScaleAbs(self.frame, alpha=contrast, beta=brightness)
+        adjusted = cv2.convertScaleAbs(self.edited_frame, alpha=contrast, beta=brightness)
         return adjusted, self.labels
 
     def replace_background(self) -> np.ndarray:
@@ -169,16 +176,16 @@ class ImageAugmentor:
         replacement_color = (122, 207, 246)
 
         # Create a mask for all pixels that are black (0, 0, 0)
-        black_mask = (self.frame == [0, 0, 0]).all(axis=2)
+        black_mask = (self.edited_frame == [0, 0, 0]).all(axis=2)
 
         # Replace black pixels with the replacement color
-        self.frame[black_mask] = replacement_color
+        self.edited_frame[black_mask] = replacement_color
         
-        return self.frame
+        return self.edited_frame
 
     def crop_and_paste_region(self) -> Tuple[np.ndarray, List[Tuple[int, float, float, float, float]]]:
         # Initialize a new frame for pasting regions
-        filled_frame = np.full_like(self.frame, (246, 207, 122), dtype=np.uint8)
+        filled_frame = np.full_like(self.edited_frame, (246, 207, 122), dtype=np.uint8)
         new_labels_list = []
         
         for label in self.labels:
@@ -197,7 +204,7 @@ class ImageAugmentor:
             y2 = int(y_center_pixel + bbox_height_pixel / 2)
 
             # Crop the region from the frame
-            cropped_region = self.frame[y1:y2, x1:x2]
+            cropped_region = self.edited_frame[y1:y2, x1:x2]
 
             # Randomly generate new_x_center and new_y_center, ensuring the cropped region fits within the frame
             new_x_center = random.uniform(bbox_width / 2, 1 - bbox_width / 2)
@@ -291,13 +298,13 @@ augmentor = ImageAugmentor(frame, borek_labels)
 # Perform augmentations
 augmented_images = augmentor.augment(
     apply_rotate=True, angle=45,
-    apply_flip=True, flip_code=1,
-    apply_duplicate=True,
-    apply_crop=True, crop_factor=0.8,
-    apply_color_filter=True,
-    apply_contrast_brightness=True, contrast=1.2, brightness=30,
-    apply_replace_background=True,
-    apply_crop_and_paste=True
+    apply_flip=False, flip_code=1,
+    apply_duplicate=False,
+    apply_crop=False, crop_factor=0.8,
+    apply_color_filter=False,
+    apply_contrast_brightness=False, contrast=1.2, brightness=30,
+    apply_replace_background=False,
+    apply_crop_and_paste=False
 )
 
 # Display augmented images with their respective transformations
@@ -307,7 +314,7 @@ for augment in augmented_images:
         #print(f"Augmentation: {augmentation_type}, Labels: {labels}")
         
         # Draw bounding boxes on the image
-        image_with_boxes = draw_bounding_boxes(image, labels)
+        #image_with_boxes = draw_bounding_boxes(image, labels)
         
         # Display the augmented image with bounding boxes
-        display_image(image_with_boxes, f"Augmentation: {augmentation_type}")
+        display_image(image, f"Augmentation: {augmentation_type}")
